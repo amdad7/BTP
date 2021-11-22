@@ -1,0 +1,266 @@
+Hi,
+I am trying to solve a 2 Degrees of Freedom spring mass system like this using `solve_ivp` function in `scipy.integrate` 
+[![enter image description here][1]][1]
+
+Here, when the mass `m1` goes beyond `d` in the negative region, `K1` becomes double i.e, when 
+
+    -infinity < x1 <= -1, k1 = 7
+    -1 < x1 <= infinity, k1 = 14
+
+This is the code that I have written without the second spring for `m1`
+
+    from scipy.integrate import solve_ivp
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    def F(t, y):
+    ##########################################################################################################################################################################################
+        m1 = 3
+        m2 = 5
+    
+        k1 = 7
+        k2 = 9
+    
+        c1 = 1
+        c2 = 2
+    
+        f1 = 40*np.cos(3*t)
+        f2 = 0
+    ##########################################################################################################################################################################################
+    
+        M = np.array([
+            [m1, 0],
+            [0, m2]
+        ])
+    
+        C = np.array([
+            [c1 + c2, -c2],
+            [-c2, c2]
+        ])
+    
+        K = np.array([
+            [k1 + k2, -k2],
+            [-k2, k2]
+        ])
+    
+        A = np.vstack([
+            np.hstack([
+                np.zeros((2, 2)), 
+                np.eye(2, 2)
+            ]), 
+            np.hstack([
+                -np.matmul(np.linalg.inv(M), K), 
+                -np.matmul(np.linalg.inv(M), C)
+            ])
+        ])
+    
+        B = np.vstack([
+            np.zeros((2, 2)), 
+            np.linalg.inv(M)
+        ])
+    
+        F = np.array([
+            [f1],
+            [f2]
+        ])
+    
+        yvec = np.array([[y[i] for i in range(4)]]).T
+    
+        ydot = np.matmul(A, yvec) + np.matmul(B, F)
+    
+        return ydot
+    
+    ####################################################################################################################################################################################
+    start_time = 0
+    end_time = 60
+    delta_t = 0.01
+    
+    initial_position_m_1 = 2
+    initial_velocity_m_1 = 1
+    
+    initial_position_m_2 = 5
+    initial_velocity_m_2 = 3
+    ####################################################################################################################################################################################
+    
+    TE = np.arange(start_time, end_time, delta_t)
+    
+    time_interval = np.array([start_time, end_time])
+    initial_conditions = np.array([initial_position_m_1, initial_position_m_2, initial_velocity_m_1, initial_velocity_m_2])
+    
+    sol = solve_ivp(F, time_interval, initial_conditions, t_eval = TE, vectorized=True, method = 'RK45')
+    
+    
+    T = sol.t
+    Y = sol.y
+    dis_m_1 = sol.y[0]
+    dis_m_2 = sol.y[1]
+    vel_m_1 = sol.y[2]
+    vel_m_2 = sol.y[3]
+    
+    plt.plot(T, dis_m_1)
+    plt.plot(T, np.full((len(dis_m_1)), -1, dtype='int32'))
+    plt.title("Displacement of m1 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, dis_m_2)
+    plt.title("Displacement of m2 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, vel_m_1)
+    plt.title("Velocity of m1 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, vel_m_2)
+    plt.title("Velocity of m2 vs time")
+    plt.xlabel("Time")
+    plt.show()
+
+
+This is the plot of displacement of `m1` without the second spring.
+
+[![enter image description here][2]][2]
+
+
+Whenever the mass `m1` goes below the horizontal line, `k1` should be equal to `14`. How can I apply an if else condition in the `return` statement of the following code for 2 springs for `m1`
+
+    from scipy.integrate import solve_ivp
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    def F(t, y):
+    ##########################################################################################################################################################################################
+        m1 = 3
+        m2 = 5
+    
+        k1 = 7
+        k2 = 9
+    
+        c1 = 1
+        c2 = 2
+    
+        f1 = 40*np.cos(3*t)
+        f2 = 0
+    ##########################################################################################################################################################################################
+    
+        M = np.array([
+            [m1, 0],
+            [0, m2]
+        ])
+    
+        C = np.array([
+            [c1 + c2, -c2],
+            [-c2, c2]
+        ])
+    
+        K = np.array([
+            [k1 + k2, -k2],
+            [-k2, k2]
+        ])
+    
+        KK = np.array([
+            [2*k1 + k2, -k2],
+            [-k2, k2]
+        ])
+    
+        A = np.vstack([
+            np.hstack([
+                np.zeros((2, 2)), 
+                np.eye(2, 2)
+            ]), 
+            np.hstack([
+                -np.matmul(np.linalg.inv(M), K), 
+                -np.matmul(np.linalg.inv(M), C)
+            ])
+        ])
+    
+        AA = np.vstack([
+            np.hstack([
+                np.zeros((2, 2)), 
+                np.eye(2, 2)
+            ]), 
+            np.hstack([
+                -np.matmul(np.linalg.inv(M), KK), 
+                -np.matmul(np.linalg.inv(M), C)
+            ])
+        ])
+    
+    
+        B = np.vstack([
+            np.zeros((2, 2)), 
+            np.linalg.inv(M)
+        ])
+    
+        F = np.array([
+            [f1],
+            [f2]
+        ])
+    
+        yvec = np.array([[y[i] for i in range(4)]]).T
+    
+        ydot1 = np.matmul(A, yvec) + np.matmul(B, F)    # k1 = 7 
+        ydot2 = np.matmul(AA, yvec) + np.matmul(B, F)   # k1 = 14
+    
+        return ???????
+    
+    ####################################################################################################################################################################################
+    start_time = 0
+    end_time = 60
+    delta_t = 0.01
+    
+    initial_position_m_1 = 2
+    initial_velocity_m_1 = 1
+    
+    initial_position_m_2 = 5
+    initial_velocity_m_2 = 3
+    ####################################################################################################################################################################################
+    
+    TE = np.arange(start_time, end_time, delta_t)
+    
+    time_interval = np.array([start_time, end_time])
+    initial_conditions = np.array([initial_position_m_1, initial_position_m_2, initial_velocity_m_1, initial_velocity_m_2])
+    
+    sol = solve_ivp(F, time_interval, initial_conditions, t_eval = TE, vectorized=True, method = 'RK45')
+    
+    
+    T = sol.t
+    Y = sol.y
+    dis_m_1 = sol.y[0]
+    dis_m_2 = sol.y[1]
+    vel_m_1 = sol.y[2]
+    vel_m_2 = sol.y[3]
+    
+    plt.plot(T, dis_m_1)
+    plt.plot(T, np.full((len(dis_m_1)), -1, dtype='int32'))
+    plt.title("Displacement of m1 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, dis_m_2)
+    plt.title("Displacement of m2 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, vel_m_1)
+    plt.title("Velocity of m1 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+    plt.plot(T, vel_m_2)
+    plt.title("Velocity of m2 vs time")
+    plt.xlabel("Time")
+    plt.show()
+    
+I think it should look something like this.
+
+    if displacement_of_m1 <= -1:
+        return ydot1
+    else:
+        return ydot2
+
+Can someone help? Thanks.
+
+  [1]: https://i.stack.imgur.com/WhAHx.png
+  [2]: https://i.stack.imgur.com/Cgpl8.png
