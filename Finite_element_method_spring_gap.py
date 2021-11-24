@@ -1,4 +1,5 @@
 from scipy.integrate import solve_ivp
+import scipy.linalg as la
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -113,29 +114,35 @@ def make_mass_matrix(n, area, density, length):
 
 
 def main():
+    number = 10                     # number of elements taken
+    length_of_beam = 5              # in meters
+    breadth_of_beam = 0.05          # in meters
+    height_of_beam = 0.05           # in meters
+    modulus_of_elasticity = 7E10
+    density_of_beam = 2700  
 
-    number = 10  # number of elements taken
+    cross_sect_area = breadth_of_beam*height_of_beam
 
-    global_stiffness_matrix = make_stiffness_matrix(number, )
-    # make_csv(STIFFNESS_MATRIX, "K")
+    area_mom_inertia = (breadth_of_beam*height_of_beam**3)/12
 
-    global_mass_matrix = make_mass_matrix(number, )
-    # make_csv(MASS_MATRIX, "M")
+    global_stiffness_matrix = make_stiffness_matrix(number, modulus_of_elasticity, area_mom_inertia, length_of_beam)
 
-    STIFFNESS_MATRIX = np.delete(STIFFNESS_MATRIX, np.s_[0:2], 0)
-    STIFFNESS_MATRIX = np.delete(STIFFNESS_MATRIX, np.s_[0:2], 1)
+    global_mass_matrix = make_mass_matrix(number, cross_sect_area, density_of_beam, length_of_beam)
 
-    MASS_MATRIX = np.delete(MASS_MATRIX, np.s_[0:2], 0)
-    MASS_MATRIX = np.delete(MASS_MATRIX, np.s_[0:2], 1)
+    global_stiffness_matrix = np.delete(global_stiffness_matrix, np.s_[0:2], 0)
+    global_stiffness_matrix = np.delete(global_stiffness_matrix, np.s_[0:2], 1)
 
-    evals, evecs = la.eigh(STIFFNESS_MATRIX, MASS_MATRIX)
+    global_mass_matrix = np.delete(global_mass_matrix, np.s_[0:2], 0)
+    global_mass_matrix = np.delete(global_mass_matrix, np.s_[0:2], 1)
 
-    # make_csv(evals, "evals")
-    # make_csv(evecs, "evecs")
+    evals, evecs = la.eigh(global_stiffness_matrix, global_mass_matrix)
 
-    frequencies = np.sqrt(evals) / (2 * np.pi)
+    frequencies = np.sqrt(evals)/(2*np.pi)
     print(frequencies)
 
+    return 
 
-if __name__ == 'main':
+
+
+if __name__ == '__main__':
     main()
