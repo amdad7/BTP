@@ -7,6 +7,9 @@ def hit_spring(t, y):
     return y[0] + 1
 
 
+
+
+
 hit_spring.terminal = True
 
 
