@@ -2,20 +2,22 @@ from scipy.integrate import solve_ivp
 import scipy.linalg as la
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
 
 def plot_graph(x_value, y_values, x_axis_label, y_axis_label, graph_title, fig_length=20, fig_height=9, gap=None):
     plt.figure(figsize=(fig_length, fig_height))
-    plt.plot(x_value, y_values, linewidth=0.8, color = 'black')
+    plt.plot(x_value, y_values, linewidth=0.8, color='black')
     if gap is not None:
         plt.plot(x_value, np.full((len(y_values)), gap))
     plt.title(graph_title)
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
+    plt.grid()
     plt.show()
 
 
-def make_stiffness_matrix(n, length, breadth, height, mod_elas):
+def make_stiffness_matrix(n, length, breadth, height, mod_elas, spring_k):
     
     mom_inertia = (breadth*height**3)/12
     k_matrix = np.array([
@@ -72,7 +74,10 @@ def make_stiffness_matrix(n, length, breadth, height, mod_elas):
     stiffness_matrix = np.delete(stiffness_matrix, np.s_[0:2], 0)
     stiffness_matrix = np.delete(stiffness_matrix, np.s_[0:2], 1)
 
-    return stiffness_matrix
+    stiffness_matrix_with_spring = copy.deepcopy(stiffness_matrix)
+    stiffness_matrix_with_spring[-2][-2] += spring_k  # ((spring_k*(length/n)**3)/(mod_elas*mom_inertia))
+
+    return stiffness_matrix, stiffness_matrix_with_spring
 
 
 def make_mass_matrix(n, length, breadth, height, density):
@@ -145,31 +150,31 @@ def find_frequencies(mass_matrix, stiffness_matrix):
     return np.sqrt(evals)/(2*np.pi)
 
 
-def ode(t, y, n, a, b, forces, freq, amplitude, type, spring_vec, gap=0):
+def ode(t, y, n, a, aa, b, forces, freq, amplitude, f_type, gap):  # spring_vec,
 
-    forces[-2] = amplitude*type(2*np.pi*freq*t)
+    forces[-2] = amplitude*f_type(2*np.pi*freq*t)
 
     yvec = np.array([[y[i] for i in range(4*n)]]).T
 
     yvec1 = np.matmul(a, yvec) + np.matmul(b, forces)
-    yvec2 = np.matmul(a, yvec) + np.matmul(b, forces)
+    yvec2 = np.matmul(aa, yvec) + np.matmul(b, forces)
 
-
-    if y[2*n - 2] < gap:
+    if y[2*n - 2] < -gap:
+        print(y[2*n - 2][0])
         return yvec2
     else:
         return yvec1
-    return yvec2
 
 
-def state_space_formulation(n, mass_matrix, stiffness_matrix, start_t, end_t, delta_t, spring_k):
+def state_space_formulation(n, mass_matrix, stiffness_matrix, stiffness_matrix_with_spring, start_t, end_t, delta_t):
+    # , spring_k
 
     t_vector = np.arange(start_t, end_t, delta_t)
     t_interval = np.array([start_t, end_t])
     init_conditions = np.zeros(4*n)
-    spring_vec = np.zeros(4*n)
-
-    spring_vec[n - 1] = spring_k
+    # spring_vec = np.zeros((1, 4*n))
+    #
+    # spring_vec[0][n - 1] = spring_k
 
     damping = np.zeros((2*n, 2*n))
 
@@ -184,6 +189,17 @@ def state_space_formulation(n, mass_matrix, stiffness_matrix, start_t, end_t, de
         ])
     ])
 
+    aa = np.vstack([
+        np.hstack([
+            np.zeros((2*n, 2*n)),
+            np.eye(2*n, 2*n)
+        ]),
+        np.hstack([
+            -np.matmul(np.linalg.inv(mass_matrix), stiffness_matrix_with_spring),
+            -np.matmul(np.linalg.inv(mass_matrix), damping)
+        ])
+    ])
+
     b = np.vstack([
         np.zeros((2*n, 2*n)), 
         np.linalg.inv(mass_matrix)
@@ -191,17 +207,19 @@ def state_space_formulation(n, mass_matrix, stiffness_matrix, start_t, end_t, de
 
     vertical_forces = np.zeros((2*n, 1))
 
-    return [init_conditions, damping, a, b, vertical_forces, t_vector, t_interval, spring_vec]
-
+    return [init_conditions, a, aa, b, vertical_forces, t_vector, t_interval]  # , spring_vec
 
 
 def main():
-    number = 4                     # number of elements taken
+    number = 4                      # number of elements taken
     length_of_beam = 5              # in meters
     breadth_of_beam = 0.05          # in meters
     height_of_beam = 0.05           # in meters
     modulus_of_elasticity = 7E10    
-    density_of_beam = 2700  
+    density_of_beam = 2700
+
+    spring_stiffness = 500
+    beam_spring_gap = 0.1
 
     global_mass_matrix = make_mass_matrix(
         number, 
@@ -211,13 +229,17 @@ def main():
         density_of_beam
     )
 
-    global_stiffness_matrix = make_stiffness_matrix(
+    global_stiffness_matrix, global_stiffness_matrix_with_spring = make_stiffness_matrix(
         number, 
         length_of_beam, 
         breadth_of_beam, 
         height_of_beam, 
-        modulus_of_elasticity
+        modulus_of_elasticity,
+        spring_stiffness
     )
+
+    print(global_stiffness_matrix)
+    print(global_stiffness_matrix_with_spring)
 
     frequencies = find_frequencies(
         global_mass_matrix, 
@@ -231,30 +253,26 @@ def main():
     time_step = 1/2000
 
     force_frequency = frequencies[0]
-    force_amplitude = 25
+    force_amplitude = 40
     force_type = np.sin
-
-    spring_stiffness = 0
-    beam_spring_gap = 0.1
 
     s_s_f_r = state_space_formulation(
         number, 
         global_mass_matrix, 
-        global_stiffness_matrix, 
+        global_stiffness_matrix,
+        global_stiffness_matrix_with_spring,
         start_time, 
         end_time, 
-        time_step, 
-        spring_stiffness
+        time_step
     )
 
     initial_conditions = s_s_f_r[0] 
-    damping_matrix = s_s_f_r[1]
-    a_matrix = s_s_f_r[2]
+    a_matrix = s_s_f_r[1]
+    aa_matrix = s_s_f_r[2]
     b_matrix = s_s_f_r[3]
     force_vector = s_s_f_r[4]
     time_vector = s_s_f_r[5]
     time_interval = s_s_f_r[6]
-    spring_vector = s_s_f_r[7]
 
     sol = solve_ivp(
         ode,
@@ -264,23 +282,20 @@ def main():
         vectorized=True, 
         args=(
             number, 
-            a_matrix, 
+            a_matrix,
+            aa_matrix,
             b_matrix, 
             force_vector, 
             force_frequency, 
             force_amplitude, 
-            force_type, 
-            beam_spring_gap,
-            spring_vector
+            force_type,
+            beam_spring_gap
         )
     )
 
-    time = sol.t
-    total_beam_profile = sol.y
-
     plot_graph(
-        time, 
-        total_beam_profile[2*number - 2], 
+        sol.t,
+        sol.y[2*number - 2],
         'time in s', 
         'displacement in m', 
         'displacement at end',
@@ -288,7 +303,5 @@ def main():
     )
 
 
-
 if __name__ == '__main__':
     main()
-
